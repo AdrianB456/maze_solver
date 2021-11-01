@@ -1,3 +1,5 @@
 # maze_solver
 
-<p> hello world</p>
+# Instalation
+
+> First install the program using ``git clone``
