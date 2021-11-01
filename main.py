@@ -42,7 +42,7 @@ q_table = np.zeros([parameter[0], parameter[1], 4])
 epsilon = 0.005
 discount = 0.9
 learning_rate = 0.15
-episodes = int(q_table.size * 1.5)
+episodes = int(q_table.size * 1.5) + len(walls) * 3
 moves_limit = 50
 epsilon_decade = epsilon / episodes
 
