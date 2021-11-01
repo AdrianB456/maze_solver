@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 pygame.init()
 
-with open(os.path.join('maps', 'hello.pkl'), 'rb+') as f:
+with open(os.path.join('maps', 'map2.pkl'), 'rb+') as f:
 	content = pickle.load(f)
 
 initial_state = content['start_pos']
