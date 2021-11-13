@@ -3,8 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 pygame.init()
 
-with open(os.path.join('maps', 'map2.pkl'), 'rb+') as f:
-	content = pickle.load(f)
+
+done = False
+while not done:
+	file = input('Which is the name of the file?')
+	try:
+		with open(os.path.join('maps', f'{file}.pkl'), 'rb+') as f:
+			content = pickle.load(f)
+		done = True
+	except:
+		print('That was not an option')
 
 initial_state = content['start_pos']
 finish = content['finish']
@@ -39,12 +47,14 @@ for wall in walls:
 	walls_rect.append(wall_rect)
 
 q_table = np.zeros([parameter[0], parameter[1], 4])
-epsilon = 0.005
+epsilon = 0.005 - (len(walls) / 1000000) * 2
 discount = 0.9
 learning_rate = 0.15
-episodes = int(q_table.size * 1.5) + len(walls) * 3
-moves_limit = 50
+episodes = int(q_table.size * 0.7)
+moves_limit = sum(parameter) * 5
 epsilon_decade = epsilon / episodes
+
+show_episode = sum(parameter) * 7
 
 dict_rewards = {'ep': [], 'avg': [], 'min': [], 'max': []}
 ep_rewards = []
@@ -54,17 +64,18 @@ for episode in range(1, episodes):
 
 	epsilon -= epsilon_decade
 	state = list(initial_state)
+	old_state = list(initial_state)
 	done = False
 
 	moves = 0
-	if episode % 1000 == 0:
+	if episode % show_episode == 0:
 		print(episode)
-		moves_limit += 50
+		moves_limit += sum(parameter) * 5
 		show = True
 	else: 
 		show = False
 
-	if episode % 1000 == 0:
+	if episode % show_episode == 0:
 		dict_rewards['ep'].append(episode)
 		dict_rewards['avg'].append(sum(ep_rewards)/len(ep_rewards))
 		dict_rewards['min'].append(min(ep_rewards))
@@ -97,6 +108,7 @@ for episode in range(1, episodes):
 			new_state[0] = state[0]
 
 		reward = -1
+		if old_state == new_state: reward *= 2 
 
 		if new_state == finish:
 			done = True
@@ -131,6 +143,7 @@ for episode in range(1, episodes):
 		if moves >= moves_limit:
 			done = True
 
+		old_state = [state[0], state[1]]
 		state = [new_state[0], new_state[1]]
 
 		position = get_pos(state)
@@ -143,7 +156,7 @@ for episode in range(1, episodes):
 			pygame.draw.rect(screen, green, finish_rect)
 			pygame.draw.rect(screen, gray, agent_rect)
 			pygame.display.update()
-			pygame.time.wait(50)
+			pygame.time.wait(30)
 
 	ep_rewards.append(episode_reward)
 
@@ -202,7 +215,7 @@ while not done:
 	pygame.draw.rect(screen, green, finish_rect)
 	pygame.draw.rect(screen, gray, agent_rect)
 	pygame.display.update()
-	pygame.time.wait(500)
+	pygame.time.wait(50)
 
 
 pygame.quit()

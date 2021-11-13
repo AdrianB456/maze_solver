@@ -97,6 +97,7 @@ for wall in walls_pos:
 
 
 clock = pygame.time.Clock()
+edit = False
 while run:
 	screen.fill((244, 244, 244))
 	for ev in pygame.event.get():
@@ -121,16 +122,7 @@ while run:
 				print('saved')
 
 		elif ev.type == pygame.MOUSEBUTTONDOWN:
-			if ev.button == 1:
-				mouse_pos = pygame.mouse.get_pos()
-				wall_pos = [mouse_pos[0] // rect_size, mouse_pos[1] // rect_size]
-
-				wall_rect = pygame.Rect(0, 0, rect_size, rect_size)
-				wall_rect.center = get_cord(wall_pos)
-				if not ocupied(wall_pos):
-					walls_pos.append(wall_pos)
-					walls_rect.append(wall_rect)
-
+			if ev.button == 1: edit = True
 
 			elif ev.button == 3:
 				mouse_pos = pygame.mouse.get_pos()
@@ -141,6 +133,19 @@ while run:
 					walls_pos.pop(wall_index)
 
 				except: pass
+
+		elif ev.type == pygame.MOUSEBUTTONUP:
+			if ev.button == 1: edit = False
+
+	if edit:
+		mouse_pos = pygame.mouse.get_pos()
+		wall_pos = [mouse_pos[0] // rect_size, mouse_pos[1] // rect_size]
+
+		wall_rect = pygame.Rect(0, 0, rect_size, rect_size)
+		wall_rect.center = get_cord(wall_pos)
+		if not ocupied(wall_pos):
+			walls_pos.append(wall_pos)
+			walls_rect.append(wall_rect)
 
 
 	pygame.draw.rect(screen, gray, start_rect)
