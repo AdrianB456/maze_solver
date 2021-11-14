@@ -47,10 +47,10 @@ for wall in walls:
 	walls_rect.append(wall_rect)
 
 q_table = np.zeros([parameter[0], parameter[1], 4])
-epsilon = 0.005 - (len(walls) / 1000000) * 2
+epsilon = 0.005
 discount = 0.9
-learning_rate = 0.15
-episodes = int(q_table.size * 0.7)
+learning_rate = 0.1
+episodes = int(q_table.size * 0.5) + len(walls) * 2 + 1000
 moves_limit = sum(parameter) * 5
 epsilon_decade = epsilon / episodes
 
@@ -64,7 +64,7 @@ for episode in range(1, episodes):
 
 	epsilon -= epsilon_decade
 	state = list(initial_state)
-	old_state = list(initial_state)
+	all_states = [state]
 	done = False
 
 	moves = 0
@@ -108,7 +108,13 @@ for episode in range(1, episodes):
 			new_state[0] = state[0]
 
 		reward = -1
-		if old_state == new_state: reward *= 2 
+
+		times_same_place = 0
+		for old_state in all_states:
+			if old_state == new_state:
+				times_same_place += 1
+
+		if times_same_place > 2: reward *= 2
 
 		if new_state == finish:
 			done = True
@@ -143,8 +149,8 @@ for episode in range(1, episodes):
 		if moves >= moves_limit:
 			done = True
 
-		old_state = [state[0], state[1]]
 		state = [new_state[0], new_state[1]]
+		all_states.append(state)
 
 		position = get_pos(state)
 		agent_rect.center = position
