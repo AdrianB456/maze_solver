@@ -1,58 +1,24 @@
-import pygame, pickle, os, sys, glob
+import pygame, random, sys, os, pickle
+import numpy as np
+import matplotlib.pyplot as plt
 pygame.init()
 
-def input_file():
-	user_input = input('What will be the name of the file? ')
-	while user_input == '':
-		print('That name can\'t be aplied. \n')
-		user_input = input('What will be the name of the file? ')
 
-	return user_input
+done = False
+while not done:
+	file = input('Which is the name of the file?')
+	try:
+		with open(os.path.join('maps', f'{file}.pkl'), 'rb+') as f:
+			content = pickle.load(f)
+		done = True
+	except:
+		print('That was not an option')
 
-def file_exists(file_name):
-	exists = False
-
-	path = os.getcwd()
-	files = glob.glob(path + '\\maps\\*.pkl')
-	for file_path in files:
-		if file_name in file_path:
-			exists = True
-
-	return exists
-
-
-file_name = input_file() + '.pkl'
-files_in_directory = glob.glob(os.getcwd() + '\\maps\\*.pkl')
-
-overwrite = False
-while file_exists(file_name) and not overwrite:
-	user_input = input('That file name already exists. Want to overwrite it? [n/y] ')
-
-	while user_input != 'y' and user_input != 'n':
-		print('That is not a valid answere. \n')
-		user_input = input('That file name already exists. Want to overwrite it? [n/y] ')
-
-	if user_input == 'y':
-		overwrite = True
-
-	else: file_name = input_file() + '.pkl'
-
-file = os.path.join('maps', file_name)
-
-parameter = [60, 60]
-rect_size = 10
-
-start_pos = [0, 0]
-finish = [59, 59]
-
-
-if not (0 <= finish[0] < parameter[0] and 0 <= finish[1] < parameter[1]):
-	print('Error: The coordinate of the finish point was either to low or to high for the parameter') 
-	sys.exit()
-
-if not (0 <= start_pos[0] < parameter[0] and 0 <= start_pos[1] < parameter[1]):
-	print('Error: The coordinate of the starting point was either to low or to high for the parameter') 
-	sys.exit()
+initial_state = content['start_pos']
+finish = content['finish']
+walls = content['walls_pos']
+parameter = content['parameter']
+rect_size = content['rect_size']
 
 x_screen = parameter[0] * rect_size
 y_screen = parameter[1] * rect_size
@@ -63,96 +29,199 @@ gray = (160, 160, 160)
 green = (24, 244, 24)
 
 screen = pygame.display.set_mode((x_screen, y_screen))
+clock = pygame.time.Clock()
 
-def get_cord(pos):
-	x_pos = pos[0] * rect_size + rect_size / 2
-	y_pos = pos[1] * rect_size + rect_size / 2
+
+def get_pos(state):
+	x_pos = state[0] * rect_size + rect_size / 2
+	y_pos = state[1] * rect_size + rect_size / 2
 	return (x_pos, y_pos)
 
-def ocupied(pos):
-	ocupied = False
-
-	if pos == start_pos or pos == finish:
-		ocupied = True
-
-	for wall_pos in walls_pos:
-		if pos == wall_pos:
-			ocupied = True
-
-	return ocupied
-
-start_rect = pygame.Rect(0, 0, rect_size, rect_size)
-start_rect.center = get_cord(start_pos)
+agent_rect = pygame.Rect(0, 0, rect_size, rect_size)
 finish_rect = pygame.Rect(0, 0, rect_size, rect_size)
-finish_rect.center = get_cord(finish)
-
-run = True
-walls_pos = []
+finish_rect.center = get_pos(finish)
 walls_rect = []
-for wall in walls_pos:
-	pos = get_cord(wall)
+for wall in walls:
 	wall_rect = pygame.Rect(0, 0, rect_size, rect_size)
-	wall_rect.center = pos
+	wall_rect.center = get_pos(wall)
 	walls_rect.append(wall_rect)
 
+q_table = np.zeros([parameter[0], parameter[1], 4])
+epsilon = 0.005
+discount = 0.9
+learning_rate = 0.1
+episodes = int(q_table.size * 0.5) + len(walls) * 2 + 1000
+moves_limit = sum(parameter) * 5
+epsilon_decade = epsilon / episodes
 
-clock = pygame.time.Clock()
-edit = False
-while run:
-	screen.fill((244, 244, 244))
+show_episode = sum(parameter) * 7
+
+dict_rewards = {'ep': [], 'avg': [], 'min': [], 'max': []}
+ep_rewards = []
+
+for episode in range(1, episodes):
+	episode_reward = 0
+
+	epsilon -= epsilon_decade
+	state = list(initial_state)
+	all_states = [state]
+	done = False
+
+	moves = 0
+	if episode % show_episode == 0:
+		print(episode)
+		moves_limit += sum(parameter) * 5
+		show = True
+	else: 
+		show = False
+
+	if episode % show_episode == 0:
+		dict_rewards['ep'].append(episode)
+		dict_rewards['avg'].append(sum(ep_rewards)/len(ep_rewards))
+		dict_rewards['min'].append(min(ep_rewards))
+		dict_rewards['max'].append(max(ep_rewards))
+		ep_rewards = []
+
+	while not done:
+		for ev in pygame.event.get():
+			if ev.type == pygame.QUIT:
+				pygame.quit()
+				sys.exit()
+
+		new_state = [0, 0]
+		if random.random() <= epsilon:
+			action = random.randint(0, 3)
+		else:
+			action = np.argmax(q_table[state[0]][state[1]])
+
+		if action == 0:
+			new_state[0] = state[0] - 1
+			new_state[1] = state[1]
+		elif action == 1:
+			new_state[0] = state[0] + 1
+			new_state[1] = state[1]
+		elif action == 2:
+			new_state[1] = state[1] + 1
+			new_state[0] = state[0]
+		elif action == 3:
+			new_state[1] = state[1] - 1
+			new_state[0] = state[0]
+
+		reward = -1
+
+		times_same_place = 0
+		for old_state in all_states:
+			if old_state == new_state:
+				times_same_place += 1
+
+		if times_same_place > 4: reward *= 2
+
+		if new_state == finish:
+			done = True
+			reward = 100
+			print('Made it in episode ' + str(episode) + '.')
+		for wall in walls:
+			if new_state == wall:
+				done = True
+				reward = -q_table.size
+
+		try: q_table[new_state[0]][new_state[1]]
+		except: 
+			done = True
+			reward = -q_table.size
+
+		if new_state[0] < 0 or new_state[1] < 0: 
+			done = True
+			reward = -q_table.size
+
+		episode_reward += reward
+
+		if not done:
+			max_next_q = np.max(q_table[new_state[0]][new_state[1]])
+			old_q = q_table[state[0]][state[1]][action]
+			
+			new_q = (1 - learning_rate) * old_q + learning_rate * (reward + discount * max_next_q)
+			q_table[state[0]][state[1]][action] = new_q
+		if done: 
+			q_table[state[0]][state[1]][action] = reward
+
+		moves += 1
+		if moves >= moves_limit:
+			done = True
+
+		state = [new_state[0], new_state[1]]
+		all_states.append(state)
+
+		position = get_pos(state)
+		agent_rect.center = position
+
+		if show:
+			screen.fill(white)
+			for wall_rect in walls_rect:
+				pygame.draw.rect(screen, black, wall_rect)
+			pygame.draw.rect(screen, green, finish_rect)
+			pygame.draw.rect(screen, gray, agent_rect)
+			pygame.display.update()
+			pygame.time.wait(30)
+
+	ep_rewards.append(episode_reward)
+
+plt.plot(dict_rewards['ep'], dict_rewards['avg'], label='average')
+plt.plot(dict_rewards['ep'], dict_rewards['min'], label='minimum')
+plt.plot(dict_rewards['ep'], dict_rewards['max'], label='maximum')
+plt.legend(loc=4)
+plt.show()
+
+done = False
+state = list(initial_state)
+
+move = False
+
+while not done:
+	screen.fill(white)
 	for ev in pygame.event.get():
 		if ev.type == pygame.QUIT:
-			run = False
 			pygame.quit()
 			sys.exit()
 
 		if ev.type == pygame.KEYDOWN:
 			if ev.key == pygame.K_RETURN:
-				dictionary = {
-					'start_pos':start_pos,
-					'rect_size': rect_size,
-					'finish': finish,
-					'parameter': parameter,
-					'walls_pos': walls_pos
-				}
+				move = True
 
-				with open(file, 'wb+') as f:
-					pickle.dump(dictionary, f)
+	if move:
+		action = np.argmax(q_table[state[0]][state[1]])
 
-				print('saved')
+		if action == 0:
+			state[0] -= 1
+		elif action == 1:
+			state[0] += 1
+		elif action == 2:
+			state[1] += 1
+		elif action == 3:
+			state[1] -= 1
 
-		elif ev.type == pygame.MOUSEBUTTONDOWN:
-			if ev.button == 1: edit = True
+	if state == finish:
+		done = True
+	for wall in walls:
+		if state == wall:
+			done = True
 
-			elif ev.button == 3:
-				mouse_pos = pygame.mouse.get_pos()
-				wall_pos = [mouse_pos[0] // rect_size, mouse_pos[1] // rect_size]
-				try:
-					wall_index = walls_pos.index(wall_pos)
-					walls_rect.pop(wall_index)
-					walls_pos.pop(wall_index)
+	position = get_pos(state)
+	agent_rect.center = position
 
-				except: pass
+	try: q_table[state[0]][state[1]]
+	except: 
+		done = True
 
-		elif ev.type == pygame.MOUSEBUTTONUP:
-			if ev.button == 1: edit = False
+	if state[0] < 0 or state[1] < 0: 
+		done = True
 
-	if edit:
-		mouse_pos = pygame.mouse.get_pos()
-		wall_pos = [mouse_pos[0] // rect_size, mouse_pos[1] // rect_size]
-
-		wall_rect = pygame.Rect(0, 0, rect_size, rect_size)
-		wall_rect.center = get_cord(wall_pos)
-		if not ocupied(wall_pos):
-			walls_pos.append(wall_pos)
-			walls_rect.append(wall_rect)
-
-
-	pygame.draw.rect(screen, gray, start_rect)
+	for wall_rect in walls_rect:
+		pygame.draw.rect(screen, black, wall_rect)
 	pygame.draw.rect(screen, green, finish_rect)
-
-	for wall in walls_rect:
-		pygame.draw.rect(screen, black, wall)
+	pygame.draw.rect(screen, gray, agent_rect)
 	pygame.display.update()
-	clock.tick(30)
+	pygame.time.wait(50)
 
+
+pygame.quit()
