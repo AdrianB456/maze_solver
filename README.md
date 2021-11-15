@@ -7,7 +7,7 @@ The idea of this AI is to be able to solve a map no matter what dimesions and po
 
 To install this AI you need to have the following requiremenets:
 
-- Python 3.*
+- Python 3.9.*
 - Pygame 2.0.0
 - Numpy 1.20.1
 - Matplotlib 3.4.3
